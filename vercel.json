@@ -1,1 +1,1 @@
-{"installCommand":"corepack enable && corepack prepare pnpm@9.12.2 --activate && pnpm install","buildCommand":"pnpm run build","outputDirectory":"frontend/dist"}
+{"installCommand":"npx pnpm@9.12.2 install --frozen-lockfile","buildCommand":"npx pnpm@9.12.2 run build","outputDirectory":"frontend/dist"}
