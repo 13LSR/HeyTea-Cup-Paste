@@ -10,8 +10,8 @@
     "frontend:dev": "npm run dev --prefix frontend",
     "frontend:start": "npm run start --prefix frontend",
     "server:start": "npm run start --prefix server",
-    "build": "npm run frontend:build",
-    "start": "npm run frontend:build && npm run server:start"
+    "build": "npm run frontend:build && node scripts/copy-dist.js",
+    "start": "npm run frontend:build && node scripts/copy-dist.js && npm run server:start"
   },
   "repository": {
     "type": "git",
