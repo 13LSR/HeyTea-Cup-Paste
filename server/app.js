@@ -7,7 +7,13 @@ const axios = require('axios');
 const multer = require('multer');
 const FormData = require('form-data');
 
-const { HEYTEA_API_BASE, HEYTEA_BASE_HEADERS, CUP_WIDTH, CUP_HEIGHT } = require('./heyteaConfig');
+const {
+  HEYTEA_API_BASE,
+  HEYTEA_BASE_HEADERS,
+  HEYTEA_UPLOAD_HEADERS,
+  CUP_WIDTH,
+  CUP_HEIGHT,
+} = require('./heyteaConfig');
 const { encryptHeyteaMobile, timestampSign, decryptResponseData } = require('./heyteaCrypto');
 
 const app = express();
@@ -44,6 +50,17 @@ function buildHeaders(currentPage, token) {
   const headers = {
     ...HEYTEA_BASE_HEADERS,
     'current-page': currentPage,
+  };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+function buildUploadHeaders(token) {
+  const headers = {
+    ...HEYTEA_UPLOAD_HEADERS,
+    'current-page': '/pages/diy/submit/index',
   };
   if (token) {
     headers.Authorization = `Bearer ${token}`;
@@ -199,8 +216,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
     const timestamp = Date.now();
     const sign = timestampSign(userMainId, timestamp);
-    const headers = buildHeaders('/pages/diy/submit/index', token);
-    delete headers['Content-Type'];
+    const headers = buildUploadHeaders(token);
 
     const formData = new FormData();
     formData.append('file', req.file.buffer, {

@@ -363,6 +363,30 @@
                     </div>
                   </div>
                 </div>
+                <div class="rounded-lg border border-gray-200 bg-white p-5 space-y-3">
+                  <div class="flex items-start justify-between gap-3">
+                    <div>
+                      <p class="text-sm font-semibold text-gray-900">实际打印效果预览</p>
+                      <p class="text-xs text-gray-500">模拟 36×76mm 热敏纸，红色区域为出血线</p>
+                    </div>
+                    <span class="rounded-md border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600">Print Preview</span>
+                  </div>
+                  <div class="relative rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <canvas
+                      ref="printPreviewCanvasRef"
+                      class="mx-auto block w-full max-w-[320px]"
+                      :class="{ 'opacity-60': !hasPreview }"
+                      style="aspect-ratio: 360 / 760"
+                    />
+                    <div
+                      v-if="!hasPreview"
+                      class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg text-center text-xs font-medium text-gray-400"
+                    >
+                      生成杯贴后可预览打印效果
+                    </div>
+                  </div>
+                  <p class="text-xs text-gray-500">示意取餐号取自账号 ID 后四位，仅供参考。</p>
+                </div>                
               </div>
             </div>
           </div>
@@ -451,7 +475,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { ElMessage, ElMessageBox, ElIcon } from 'element-plus';
 import { Upload, Download, Picture, Refresh, Pointer, InfoFilled, Close, SuccessFilled, CircleClose, Edit } from '@element-plus/icons-vue';
 import { isAxiosError } from 'axios';
@@ -469,6 +493,23 @@ import {
   type CaptchaPayload,
   type HeyTeaUser,
 } from '@/services/heytea';
+// 打印预览用的画布 ref
+const printPreviewCanvasRef = ref<HTMLCanvasElement | null>(null);
+
+// 打印预览右下角 logo（使用 public/icon.png）
+const previewLogo = new Image();
+let previewLogoReady = false;
+previewLogo.onload = () => {
+  previewLogoReady = true;
+};
+previewLogo.src = '/icon.png';
+
+function getPickupNumber() {
+  const raw = user.value?.user_main_id;
+  if (!raw) return '8888';
+  const tail = String(raw).slice(-4);
+  return tail.padStart(4, '0');
+}
 
 const GITHUB_URL = 'https://github.com/13LSR/HeyTea-Cup-Paste/';
 const STORAGE_KEY = 'heytea-token';
@@ -871,6 +912,7 @@ async function applyCrop() {
     
     processedBlob.value = blob;
     uploadState.value = null;
+    renderPrintPreview();
   } catch (error) {
     const message = getErrorMessage(error, '处理失败');
     ElMessage.error(message);
@@ -883,10 +925,12 @@ function cancelCrop() {
   workingImage.value = null;
   cropperImageSrc.value = '';
   processedBlob.value = null;
+  renderPrintPreview();
 }
 
 function resetToEdit() {
   processedBlob.value = null;
+  renderPrintPreview();
 }
 
 function hasFilePayload(event: DragEvent) {
@@ -1042,6 +1086,68 @@ function handleDownload() {
   link.click();
   URL.revokeObjectURL(url);
 }
+function renderPrintPreview() {
+  const canvas = printPreviewCanvasRef.value;
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const WIDTH = 360;
+  const HEIGHT = 760;
+  canvas.width = WIDTH;
+  canvas.height = HEIGHT;
+
+  // 背景
+  ctx.fillStyle = '#eaeaea';
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+  // 绘制杯贴内容（从主预览 canvas 缩放过来）
+  if (hasPreview.value && canvasRef.value) {
+    const src = canvasRef.value;
+    if (src.width > 0 && src.height > 0) {
+      const scale = WIDTH / src.width;
+      const scaledHeight = src.height * scale;
+      const offsetY = (HEIGHT - scaledHeight) / 2;
+      ctx.drawImage(src, 0, offsetY, WIDTH, scaledHeight);
+    }
+  }
+
+  drawWarningBands(ctx, WIDTH, HEIGHT);
+  drawPickupInfo(ctx);
+  drawPreviewLogo(ctx, WIDTH, HEIGHT);
+}
+
+function drawWarningBands(ctx: CanvasRenderingContext2D, width: number, height: number) {
+  const warningWidth = width * 0.06;
+  ctx.fillStyle = 'rgba(255, 100, 100, 0.4)';
+  ctx.fillRect(0, 0, warningWidth, height);
+  ctx.fillRect(width - warningWidth, 0, warningWidth, height);
+
+  ctx.strokeStyle = 'rgba(255, 0, 0, 0.6)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(12, 30, width - 24, height - 60);
+}
+
+function drawPickupInfo(ctx: CanvasRenderingContext2D) {
+  ctx.fillStyle = '#000';
+  ctx.font = 'bold 48px system-ui, -apple-system, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(getPickupNumber(), 30, 40);
+}
+
+function drawPreviewLogo(ctx: CanvasRenderingContext2D, width: number, height: number) {
+  if (!previewLogoReady || !previewLogo.naturalWidth || !previewLogo.naturalHeight) return;
+  const logoSize = 48;
+  const padding = 24;
+  ctx.drawImage(
+    previewLogo,
+    width - logoSize - padding,
+    height - logoSize - padding,
+    logoSize,
+    logoSize,
+  );
+}
 
 watch([toneMode, binaryThreshold, forcePng], () => {
   if (hasPreview.value && workingImage.value) {
@@ -1061,6 +1167,10 @@ if (authToken.value) {
   manualToken.value = authToken.value;
   resolveUserProfile();
 }
+
+onMounted(() => {
+  renderPrintPreview();
+});
 
 onUnmounted(() => {
   if (countdownTimer) {
