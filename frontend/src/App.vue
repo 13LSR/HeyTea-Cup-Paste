@@ -484,7 +484,7 @@ import 'vue-advanced-cropper/dist/style.css';
 
 import { CAPTCHA_APP_ID, CUP_HEIGHT, CUP_WIDTH, MAX_UPLOAD_BYTES } from '@/config/heytea';
 import { requestCaptcha } from '@/utils/captcha';
-import { loadImage, type ToneMode } from '@/utils/image';
+import { loadImage, type ToneMode, applyHalftoneDots, applySharpBinary } from '@/utils/image';
 import {
   fetchUserInfo,
   loginWithSms,
@@ -518,6 +518,8 @@ const DONATE_QR_URL = 'https://dataphoto.sibnet.ru/upload/imggreat/1763393134741
 
 const toneOptions = [
   { label: '黑白', value: 'binary' as ToneMode },
+  { label: '网格半调', value: 'halftone' as ToneMode },
+  { label: '黑白清晰', value: 'sharp-binary' as ToneMode },
   { label: '灰度', value: 'grayscale' as ToneMode },
   { label: '原图', value: 'original' as ToneMode },
 ];
@@ -799,33 +801,6 @@ function handleCropperClose() {
   // Modal closed
 }
 
-async function compressImage(blob: Blob, maxSizeBytes: number): Promise<Blob> {
-  // Use browser-image-compression library
-  if (typeof (window as any).imageCompression === 'undefined') {
-    throw new Error('图片压缩库未加载');
-  }
-
-  const imageCompression = (window as any).imageCompression;
-  
-  // Convert blob to File if needed
-  const file = blob instanceof File ? blob : new File([blob], 'image.png', { type: blob.type });
-  
-  const options = {
-    maxSizeMB: maxSizeBytes / (1024 * 1024),
-    maxWidthOrHeight: Math.max(CUP_WIDTH, CUP_HEIGHT),
-    useWebWorker: true,
-    fileType: forcePng.value ? 'image/png' : undefined,
-  };
-
-  try {
-    const compressedFile = await imageCompression(file, options);
-    return compressedFile;
-  } catch (error) {
-    console.error('Compression error:', error);
-    return blob;
-  }
-}
-
 async function applyCrop() {
   if (!cropperRef.value || !canvasRef.value) return;
   
@@ -866,6 +841,12 @@ async function applyCrop() {
           break;
         case 'grayscale':
           applyGrayscale(imageData);
+          break;
+        case 'halftone':
+          applyHalftoneDots(imageData);
+          break;
+        case 'sharp-binary':
+          applySharpBinary(imageData, binaryThreshold.value);
           break;
       }
       ctx.putImageData(imageData, 0, 0);

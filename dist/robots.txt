@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://xicha.331106.xyz/sitemap.xml
